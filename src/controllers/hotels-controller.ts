@@ -1,28 +1,26 @@
+import { AuthenticatedRequest } from "@/middlewares";
 import hotelService from "@/services/hotel-service";
-import { Request, Response } from "express";
+import { Response } from "express";
 import httpStatus from "http-status";
 
-export async function getHotelByUser(req: Request, res: Response) {
+export async function getHotels(req: AuthenticatedRequest, res: Response) {
+  const { userId } = req;
+  
   try {
-    const hotels = await hotelService.getHotels();
-
-    if (!hotels) {
-      return res.sendStatus(httpStatus.NOT_FOUND);
-    }
-
+    const hotels = await hotelService.getHotels(Number(userId));
+    
     return res.status(httpStatus.OK).send(hotels);
   } catch (error) {
-    return res.sendStatus(httpStatus.NO_CONTENT);
+    return res.sendStatus(httpStatus.NOT_FOUND);
   }
 }
 
-export async function getHotelRoomById(req: Request, res: Response) {
+export async function getHotelRoomById(req: AuthenticatedRequest, res: Response) {
   const { hotelId } = req.params;
-  
-  const id = Number(hotelId);
+
   try {
-    const Rooms = await hotelService.getHotelRooms(id);
-    const hotel = await hotelService.getOneHotel(id);
+    const Rooms = await hotelService.getHotelRooms(Number(hotelId));
+    const hotel = await hotelService.getOneHotel(Number(hotelId));
 
     const result = {
       ...hotel,
