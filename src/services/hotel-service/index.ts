@@ -7,7 +7,7 @@ import ticketRepository from "@/repositories/ticket-repository";
 async function getHotels(userId: number): Promise<Hotel[]> {
   const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
   if (!enrollment) {
-    throw notFoundError; 
+    throw notFoundError;
   }
 
   const ticket = await ticketRepository.findTicketByEnrollmentId(enrollment.id);
@@ -24,14 +24,29 @@ async function getOneHotel(hotelId: number): Promise<Hotel> {
   return hotel;
 }
 
-async function getHotelRooms(hotelId: number): Promise<Room[]> {
-  const rooms = await hotelRepository.findManyHotelRooms(hotelId);
-  return rooms;
+async function getHotelWithRooms(hotelId: number, userId: number): Promise<(Hotel & { Rooms: Room[]})> {
+  const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
+  if (!enrollment) {
+    throw notFoundError;
+  }
+
+  const ticket = await ticketRepository.findTicketByEnrollmentId(enrollment.id);
+  if (!ticket || ticket.status === "RESERVED" || ticket.TicketType.isRemote || !ticket.TicketType.includesHotel) {
+    throw notFoundError;
+  }
+
+  const hotel = await hotelRepository.findManyHotelRooms(hotelId);
+
+  if (!hotel) {
+    throw notFoundError;
+  }
+
+  return hotel;
 }
 
 const hotelService = {
   getHotels,
-  getHotelRooms,
+  getHotelWithRooms,
   getOneHotel
 };
 
