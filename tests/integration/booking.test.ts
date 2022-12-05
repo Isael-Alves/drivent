@@ -52,8 +52,6 @@ describe("GET /booking", () => {
   });
 
   describe("When token is valid", () => {
-    //verificar se tem o ticket se o ticket é presencial, pago e com hospedagem
-    
     it("Should respond with status 200 and with booking body", async () => {
       const user = await createUser();
       const token = await generateValidToken(user);
@@ -76,6 +74,27 @@ describe("GET /booking", () => {
         createdAt: booking.createdAt.toISOString(),
         updatedAt: booking.updatedAt.toISOString(),
       });
+    });
+
+    it("Should respond with status 404 when user adress not found", async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+
+      const result = (await server.get("/booking").set("Authorization", `Bearer ${token}`));
+      
+      expect(result.status).toBe(httpStatus.NOT_FOUND);
+    });
+
+    it("should respond with status 401 when user doesnt own given ticket", async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+      const enrollment = await createEnrollmentWithAddress(user);
+      const TicketType = await createTicketTypeRemoteAndIncludeHotel();
+      await createTicket(enrollment.id, TicketType.id, TicketStatus.RESERVED);
+
+      const result = (await server.get("/booking").set("Authorization", `Bearer ${token}`));
+
+      expect(result.status).toEqual(httpStatus.UNAUTHORIZED);
     });
   });
 });
@@ -121,6 +140,53 @@ describe("POST /booking", () => {
 
       const result = (await server.post("/booking").set("Authorization", `Bearer ${token}`).send(body));
       expect(result.status).toBe(httpStatus.OK);
+    });
+    
+    it("Should respond with status 404 when user adress not found", async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+      await createTicketTypeRemoteAndIncludeHotel();
+      const hotel = await createHotel();
+      const room = await createRooms(hotel.id);
+
+      const body = { roomId: room.id };
+
+      const result = (await server.post("/booking").set("Authorization", `Bearer ${token}`).send(body));
+      expect(result.status).toBe(httpStatus.NOT_FOUND);
+    });
+
+    it("should respond with status 401 when user doesnt own given ticket", async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+      const enrollment = await createEnrollmentWithAddress(user);
+      const TicketType = await createTicketTypeRemoteAndIncludeHotel();
+      const ticket = await createTicket(enrollment.id, TicketType.id, TicketStatus.RESERVED);
+      await createPayment(ticket.id, TicketType.price);
+      const hotel = await createHotel();
+      const room = await createRooms(hotel.id);
+
+      const body = { roomId: room.id };
+
+      const result = (await (await server.post("/booking").set("Authorization", `Bearer ${token}`).send(body)));
+
+      expect(result.status).toBe(httpStatus.UNAUTHORIZED);
+    });
+
+    it("Should respond with status 404 when roomId is not found", async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+      const enrollment = await createEnrollmentWithAddress(user);
+      const TicketType = await createTicketTypeRemoteAndIncludeHotel();
+      const ticket = await createTicket(enrollment.id, TicketType.id, TicketStatus.PAID);
+      await createPayment(ticket.id, TicketType.price);
+      const hotel = await createHotel();
+      await createRooms(hotel.id);
+      const newRoom = await findFirstRoomsByRoomId(enrollment.id);
+
+      const body = { roomId: newRoom };
+
+      const result = (await server.post("/booking").set("Authorization", `Bearer ${token}`).send(body));
+      expect(result.status).toBe(httpStatus.NOT_FOUND);
     });
   });
 });
@@ -208,6 +274,39 @@ describe("PUT /booking", () => {
       const result = (await server.put(`/booking/${booking.id}`).set("Authorization", `Bearer ${token}`).send(body));
 
       expect(result.status).toBe(httpStatus.FORBIDDEN);
+    });
+
+    it("Should respond with status 404 when user adress not found", async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+      const hotel = await createHotel();
+      const room = await createRooms(hotel.id);
+      const newRoom = await createRooms(hotel.id);
+      const booking = await createBooking(user.id, room.id);
+
+      const body = { roomId: newRoom.id };
+
+      const result = (await server.put(`/booking/${booking.id}`).set("Authorization", `Bearer ${token}`).send(body));
+
+      expect(result.status).toBe(httpStatus.NOT_FOUND);
+    });
+
+    it("Should respond with status 401 when the user has no reservation", async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+      const enrollment = await createEnrollmentWithAddress(user);
+      const TicketType = await createTicketTypeRemoteAndIncludeHotel();
+      const ticket = await createTicket(enrollment.id, TicketType.id, TicketStatus.PAID);
+      await createPayment(ticket.id, TicketType.price);
+      const hotel = await createHotel();
+      await createRooms(hotel.id);
+      const newRoom = await createRooms(hotel.id);
+
+      const body = { roomId: newRoom.id };
+
+      const result = (await server.put("/booking/1").set("Authorization", `Bearer ${token}`).send(body));
+
+      expect(result.status).toBe(httpStatus.UNAUTHORIZED);
     });
   });
 });
